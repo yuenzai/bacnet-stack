@@ -38,6 +38,7 @@
 #include "bacnet/datalink/datalink.h"
 #include "bacnet/datalink/dlenv.h"
 #include "bacport.h"
+#include <cjson/cJSON.h>
 
 #if BACNET_SVC_SERVER
 #error "App requires server-only features disabled! Set BACNET_SVC_SERVER=0"
@@ -94,6 +95,128 @@ static void MyRejectHandler(
     }
 }
 
+static void rpm_ack_obj_to_json(BACNET_READ_ACCESS_DATA *rpm_data, cJSON *obj_arr)
+{
+    BACNET_PROPERTY_REFERENCE *listOfProperties = NULL;
+    BACNET_APPLICATION_DATA_VALUE *value = NULL;
+
+    cJSON *obj = NULL;
+    cJSON *object_type = NULL;
+    cJSON *object_instance = NULL;
+
+    cJSON *properties = NULL;
+    cJSON *property = NULL;
+    cJSON *property_values = NULL;
+    cJSON *property_value = NULL;
+    cJSON *error = NULL;
+
+    BACNET_OBJECT_ID *object_id = NULL;
+    cJSON *value_object_id = NULL;
+
+    if (rpm_data) {
+        obj = cJSON_CreateObject();
+        object_type = cJSON_CreateNumber(rpm_data->object_type);
+        object_instance = cJSON_CreateNumber(rpm_data->object_instance);
+        properties = cJSON_CreateArray();
+
+        listOfProperties = rpm_data->listOfProperties;
+        while (listOfProperties) {
+            property = cJSON_CreateObject();
+
+            cJSON_AddNumberToObject(property, "propertyIdentifier", listOfProperties->propertyIdentifier);
+            if (listOfProperties->propertyArrayIndex == BACNET_ARRAY_ALL) {
+                cJSON_AddNullToObject(property, "propertyArrayIndex");
+            } else {
+                cJSON_AddNumberToObject(property, "propertyArrayIndex", listOfProperties->propertyArrayIndex);
+            }
+
+            value = listOfProperties->value;
+            if (value) {
+                property_values = cJSON_CreateArray();
+                while (value) {
+                    property_value = cJSON_CreateObject();
+                    cJSON_AddNumberToObject(property_value, "valueType", value->tag);
+                    switch (value->tag) {
+                        case BACNET_APPLICATION_TAG_NULL:
+                            cJSON_AddNullToObject(property_value, "value");
+                            break;
+                        case BACNET_APPLICATION_TAG_BOOLEAN:
+                            cJSON_AddBoolToObject(property_value, "value", value->type.Boolean);
+                            break;
+                        case BACNET_APPLICATION_TAG_UNSIGNED_INT:
+                            cJSON_AddNumberToObject(property_value, "value", value->type.Unsigned_Int);
+                            break;
+                        case BACNET_APPLICATION_TAG_SIGNED_INT:
+                            cJSON_AddNumberToObject(property_value, "value", value->type.Signed_Int);
+                            break;
+                        case BACNET_APPLICATION_TAG_REAL:
+                            cJSON_AddNumberToObject(property_value, "value", value->type.Real);
+                            break;
+                        case BACNET_APPLICATION_TAG_DOUBLE:
+                            cJSON_AddNumberToObject(property_value, "value", value->type.Double);
+                            break;
+                        case BACNET_APPLICATION_TAG_ENUMERATED:
+                            cJSON_AddNumberToObject(property_value, "value", value->type.Enumerated);
+                            break;
+                        case BACNET_APPLICATION_TAG_OBJECT_ID:
+                            object_id = &value->type.Object_Id;
+                            value_object_id = cJSON_CreateObject();
+                            cJSON_AddNumberToObject(value_object_id, "objectType", object_id->type);
+                            cJSON_AddNumberToObject(value_object_id, "objectInstance", object_id->instance);
+                            cJSON_AddItemToObject(property_value, "value", value_object_id);
+                            break;
+                        /* case BACNET_APPLICATION_TAG_OCTET_STRING:
+                            BACNET_OCTET_STRING *octet_string = &value->type.Octet_String;
+                            if (octet_string) {
+                                cJSON_AddStringToObject(property_value, "value", octet_string->value);
+                            }
+                            break;
+                        case BACNET_APPLICATION_TAG_CHARACTER_STRING:
+                            BACNET_CHARACTER_STRING *char_string = &value->type.Character_String;
+                            if (char_string) {
+                                cJSON_AddStringToObject(property_value, "value", char_string->value);
+                            }
+                            break;
+                        case BACNET_APPLICATION_TAG_BIT_STRING:
+                            break;
+                        case BACNET_APPLICATION_TAG_DATE:
+                        case BACNET_APPLICATION_TAG_TIME:
+                        case BACNET_APPLICATION_TAG_TIMESTAMP:
+                        case BACNET_APPLICATION_TAG_DATETIME:
+                        case BACNET_APPLICATION_TAG_DATERANGE:
+                            break; */
+                        default:
+                            cJSON_AddStringToObject(property_value, "value", "unsupported");
+                            break;
+                    }
+
+                    cJSON_AddItemToArray(property_values, property_value);
+
+                    value = value->next;
+                }
+
+                cJSON_AddItemToObject(property, "propertyValues", property_values);
+                cJSON_AddNullToObject(property, "error");
+            } else {
+                cJSON_AddNullToObject(property, "propertyValues");
+                error = cJSON_CreateObject();
+                cJSON_AddNumberToObject(error, "errorClass", listOfProperties->error.error_class);
+                cJSON_AddNumberToObject(error, "errorCode", listOfProperties->error.error_code);
+                cJSON_AddItemToObject(property, "error", error);
+            }
+
+            cJSON_AddItemToArray(properties, property);
+
+            listOfProperties = listOfProperties->next;
+        }
+
+        cJSON_AddItemToObject(obj, "objectType", object_type);
+        cJSON_AddItemToObject(obj, "objectInstance", object_instance);
+        cJSON_AddItemToObject(obj, "properties", properties);
+        cJSON_AddItemToArray(obj_arr, obj);
+    }
+}
+
 /** Handler for a ReadPropertyMultiple ACK.
  * @ingroup DSRPM
  * For each read property, print out the ACK'd data,
@@ -118,6 +241,8 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
     BACNET_APPLICATION_DATA_VALUE *value;
     BACNET_APPLICATION_DATA_VALUE *old_value;
 
+    char *json_str = NULL;
+
     if (address_match(&Target_Address, src) &&
         (service_data->invoke_id == Request_Invoke_ID)) {
         rpm_data = calloc(1, sizeof(BACNET_READ_ACCESS_DATA));
@@ -126,10 +251,18 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
                 service_request, service_len, rpm_data);
         }
         if (len > 0) {
+            cJSON *obj_arr = cJSON_CreateArray();
             while (rpm_data) {
-                rpm_ack_print_data(rpm_data);
+                rpm_ack_obj_to_json(rpm_data, obj_arr);
+                /* rpm_ack_print_data(rpm_data); */
                 rpm_data = rpm_data_free(rpm_data);
             }
+            json_str = cJSON_PrintUnformatted(obj_arr);
+            if (json_str) {
+                fprintf(stdout, "%s", json_str);
+                free(json_str);
+            }
+            cJSON_Delete(obj_arr);
         } else {
             fprintf(stderr, "RPM Ack Malformed! Freeing memory...\n");
             while (rpm_data) {

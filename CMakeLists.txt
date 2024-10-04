@@ -179,6 +179,7 @@ endif()
 #
 
 find_package(Threads)
+find_package(cJSON REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/bacnet/abort.c
@@ -803,7 +804,7 @@ if(BACNET_STACK_BUILD_APPS)
   target_link_libraries(readprop PRIVATE ${PROJECT_NAME})
 
   add_executable(readpropm apps/readpropm/main.c)
-  target_link_libraries(readpropm PRIVATE ${PROJECT_NAME})
+  target_link_libraries(readpropm PRIVATE ${PROJECT_NAME} ${CJSON_LIBRARIES})
 
   add_executable(readrange apps/readrange/main.c)
   target_link_libraries(readrange PRIVATE ${PROJECT_NAME})
