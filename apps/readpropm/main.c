@@ -64,7 +64,7 @@ static void MyErrorHandler(BACNET_ADDRESS *src,
 {
     if (address_match(&Target_Address, src) &&
         (invoke_id == Request_Invoke_ID)) {
-        printf("BACnet Error: %s: %s\n",
+        fprintf(stderr, "BACnet Error: %s: %s\n",
             bactext_error_class_name((int)error_class),
             bactext_error_code_name((int)error_code));
         Error_Detected = true;
@@ -77,8 +77,7 @@ static void MyAbortHandler(
     (void)server;
     if (address_match(&Target_Address, src) &&
         (invoke_id == Request_Invoke_ID)) {
-        printf(
-            "BACnet Abort: %s\n", bactext_abort_reason_name((int)abort_reason));
+        fprintf(stderr, "BACnet Abort: %s\n", bactext_abort_reason_name((int)abort_reason));
         Error_Detected = true;
     }
 }
@@ -89,7 +88,7 @@ static void MyRejectHandler(
     /* FIXME: verify src and invoke id */
     if (address_match(&Target_Address, src) &&
         (invoke_id == Request_Invoke_ID)) {
-        printf("BACnet Reject: %s\n",
+        fprintf(stderr, "BACnet Reject: %s\n",
             bactext_reject_reason_name((int)reject_reason));
         Error_Detected = true;
     }
@@ -698,7 +697,7 @@ int main(int argc, char *argv[])
             /* increment timer - exit if timed out */
             elapsed_seconds += (current_seconds - last_seconds);
             if (elapsed_seconds > timeout_seconds) {
-                printf("\rError: APDU Timeout!\n");
+                fprintf(stderr, "\rError: APDU Timeout!\n");
                 Error_Detected = true;
                 break;
             }
