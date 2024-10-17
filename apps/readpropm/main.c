@@ -241,6 +241,10 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
     BACNET_APPLICATION_DATA_VALUE *value;
     BACNET_APPLICATION_DATA_VALUE *old_value;
 
+    uint32_t device_id;
+    bool device_id_found = false;
+    cJSON *obj;
+    cJSON *obj_arr;
     char *json_str = NULL;
 
     if (address_match(&Target_Address, src) &&
@@ -250,19 +254,29 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
             len = rpm_ack_decode_service_request(
                 service_request, service_len, rpm_data);
         }
+
+        device_id_found = address_get_device_id(src, &device_id);
+
         if (len > 0) {
-            cJSON *obj_arr = cJSON_CreateArray();
+            obj = cJSON_CreateObject();
+            obj_arr = cJSON_CreateArray();
             while (rpm_data) {
                 rpm_ack_obj_to_json(rpm_data, obj_arr);
+                if (device_id_found) {
+                    cJSON_AddItemToObject(obj, "deviceInstance", cJSON_CreateNumber(device_id));
+                } else {
+                    cJSON_AddItemToObject(obj, "deviceInstance", cJSON_CreateNumber(-1));
+                }
+                cJSON_AddItemToObject(obj, "values", obj_arr);
                 /* rpm_ack_print_data(rpm_data); */
                 rpm_data = rpm_data_free(rpm_data);
             }
-            json_str = cJSON_PrintUnformatted(obj_arr);
+            json_str = cJSON_PrintUnformatted(obj);
             if (json_str) {
                 fprintf(stdout, "%s", json_str);
                 free(json_str);
             }
-            cJSON_Delete(obj_arr);
+            cJSON_Delete(obj);
         } else {
             fprintf(stderr, "RPM Ack Malformed! Freeing memory...\n");
             while (rpm_data) {
