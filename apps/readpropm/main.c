@@ -99,6 +99,7 @@ static void rpm_ack_obj_to_json(BACNET_READ_ACCESS_DATA *rpm_data, cJSON *obj_ar
     BACNET_PROPERTY_REFERENCE *listOfProperties = NULL;
     BACNET_APPLICATION_DATA_VALUE *value = NULL;
 
+    bool array_value = false;
     cJSON *obj = NULL;
     cJSON *object_type = NULL;
     cJSON *object_instance = NULL;
@@ -131,9 +132,14 @@ static void rpm_ack_obj_to_json(BACNET_READ_ACCESS_DATA *rpm_data, cJSON *obj_ar
 
             value = listOfProperties->value;
             if (value) {
-                property_values = cJSON_CreateArray();
+                property_value = cJSON_CreateObject();
+                if (value->next) {
+                    property_values = cJSON_CreateArray();
+                    array_value = true;
+                } else {
+                    array_value = false;
+                }
                 while (value) {
-                    property_value = cJSON_CreateObject();
                     cJSON_AddNumberToObject(property_value, "valueType", value->tag);
                     switch (value->tag) {
                         case BACNET_APPLICATION_TAG_NULL:
@@ -194,10 +200,15 @@ static void rpm_ack_obj_to_json(BACNET_READ_ACCESS_DATA *rpm_data, cJSON *obj_ar
                     value = value->next;
                 }
 
-                cJSON_AddItemToObject(property, "propertyValues", property_values);
+                if (array_value) {
+                    cJSON_AddItemToObject(property, "values", property_values);
+                } else {
+                    cJSON_AddItemToObject(property, "value", property_value);
+                }
+
                 cJSON_AddNullToObject(property, "error");
             } else {
-                cJSON_AddNullToObject(property, "propertyValues");
+                cJSON_AddNullToObject(property, "values");
                 error = cJSON_CreateObject();
                 cJSON_AddNumberToObject(error, "errorClass", listOfProperties->error.error_class);
                 cJSON_AddNumberToObject(error, "errorCode", listOfProperties->error.error_code);
@@ -266,7 +277,7 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
                 } else {
                     cJSON_AddItemToObject(obj, "deviceInstance", cJSON_CreateNumber(-1));
                 }
-                cJSON_AddItemToObject(obj, "values", obj_arr);
+                cJSON_AddItemToObject(obj, "results", obj_arr);
                 /* rpm_ack_print_data(rpm_data); */
                 rpm_data = rpm_data_free(rpm_data);
             }
