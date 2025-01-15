@@ -252,7 +252,6 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
     BACNET_APPLICATION_DATA_VALUE *old_value;
 
     uint32_t device_id;
-    bool device_id_found = false;
     cJSON *obj;
     cJSON *obj_arr;
     char *json_str = NULL;
@@ -265,18 +264,11 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
                 service_request, service_len, rpm_data);
         }
 
-        device_id_found = address_get_device_id(src, &device_id);
-
         if (len > 0) {
             obj = cJSON_CreateObject();
             obj_arr = cJSON_CreateArray();
             while (rpm_data) {
                 rpm_ack_obj_to_json(rpm_data, obj_arr);
-                if (device_id_found) {
-                    cJSON_AddItemToObject(obj, "deviceInstance", cJSON_CreateNumber(device_id));
-                } else {
-                    cJSON_AddItemToObject(obj, "deviceInstance", cJSON_CreateNumber(-1));
-                }
                 cJSON_AddItemToObject(obj, "results", obj_arr);
                 /* rpm_ack_print_data(rpm_data); */
                 rpm_data = rpm_data->next;
