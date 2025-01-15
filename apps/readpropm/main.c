@@ -133,8 +133,8 @@ static void rpm_ack_obj_to_json(BACNET_READ_ACCESS_DATA *rpm_data, cJSON *obj_ar
             value = listOfProperties->value;
             if (value) {
                 property_value = cJSON_CreateObject();
+                property_values = cJSON_CreateArray();
                 if (value->next) {
-                    property_values = cJSON_CreateArray();
                     array_value = true;
                 } else {
                     array_value = false;
