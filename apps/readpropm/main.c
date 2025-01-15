@@ -281,13 +281,13 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
                 /* rpm_ack_print_data(rpm_data); */
                 rpm_data = rpm_data->next;
             }
-            rpm_data = rpm_data_free(rpm_data);
+            /* rpm_data = rpm_data_free(rpm_data); */
             json_str = cJSON_PrintUnformatted(obj);
             if (json_str) {
                 fprintf(stdout, "%s", json_str);
-                free(json_str);
+                /* free(json_str); */
             }
-            cJSON_Delete(obj);
+            /* cJSON_Delete(obj); */
         } else {
             fprintf(stderr, "RPM Ack Malformed! Freeing memory...\n");
             while (rpm_data) {
