@@ -697,8 +697,6 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "\rError: failed to send request!\n");
                     break;
                 }
-            } else if (tsm_invoke_id_free(Request_Invoke_ID)) {
-                break;
             } else if (tsm_invoke_id_failed(Request_Invoke_ID)) {
                 fprintf(stderr, "\rError: TSM Timeout!\n");
                 tsm_free_invoke_id(Request_Invoke_ID);
