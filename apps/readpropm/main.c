@@ -285,7 +285,7 @@ static void My_Read_Property_Multiple_Ack_Handler(uint8_t *service_request,
             rpm_data = rpm_data_free(rpm_data);
             json_str = cJSON_PrintUnformatted(obj);
             if (json_str) {
-                fprintf(stdout, "%s", json_str);
+                fprintf(stdout, "%s\n", json_str);
                 free(json_str);
             }
             cJSON_Delete(obj);
@@ -694,11 +694,14 @@ int main(int argc, char *argv[])
                     &buffer[0], sizeof(buffer), Target_Device_Object_Instance,
                     Read_Access_Data);
                 if (Request_Invoke_ID == 0) {
-                    fprintf(stderr, "\rError: failed to send request!\n");
+                    fprintf(stderr, "Error: failed to send request!\n");
                     break;
                 }
+            } else if (tsm_invoke_id_free(Request_Invoke_ID)) {
+                fprintf(stderr, "\n");
+                break;
             } else if (tsm_invoke_id_failed(Request_Invoke_ID)) {
-                fprintf(stderr, "\rError: TSM Timeout!\n");
+                fprintf(stderr, "Error: TSM Timeout!\n");
                 tsm_free_invoke_id(Request_Invoke_ID);
                 Error_Detected = true;
                 /* try again or abort? */
@@ -708,7 +711,7 @@ int main(int argc, char *argv[])
             /* increment timer - exit if timed out */
             elapsed_seconds += (current_seconds - last_seconds);
             if (elapsed_seconds > timeout_seconds) {
-                fprintf(stderr, "\rError: APDU Timeout!\n");
+                fprintf(stderr, "Error: APDU Timeout!\n");
                 Error_Detected = true;
                 break;
             }
